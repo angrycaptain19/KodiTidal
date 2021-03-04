@@ -56,7 +56,10 @@ class DebugHelper(object):
                 if self.detailLevel == 2 and level == xbmc.LOGDEBUG:
                     # More Logging
                     level = xbmc.INFO
-                elif self.detailLevel == 3 and (level == xbmc.LOGDEBUG or level == xbmc.LOGSEVERE):
+                elif self.detailLevel == 3 and level in [
+                    xbmc.LOGDEBUG,
+                    xbmc.LOGSEVERE,
+                ]:
                     # Complex Logging
                     level = xbmc.INFO
                 if level != xbmc.LOGSEVERE:
@@ -88,7 +91,6 @@ class DebugHelper(object):
                 pydevd_path = os.path.normpath(os.path.join(comp, os.pardir, 'script.module.pydevd', 'lib'))
                 sys.path.append(pydevd_path)
                 break
-            pass
 
     def halt(self):
         ''' This is the Break-Point-Function '''
@@ -107,7 +109,6 @@ class DebugHelper(object):
             pydevd.stoptrace()
         except:
             pass
-        pass
 
     def addTidalapiLogger(self, pluginName, enableDebug):
         if not DebugHelper.logHandler:
@@ -131,7 +132,11 @@ class KodiLogHandler(logging.StreamHandler):
         self.setFormatter(formatter)
 
     def emit(self, record):
-        if record.levelno < logging.WARNING and self._modules and not record.name in self._modules:
+        if (
+            record.levelno < logging.WARNING
+            and self._modules
+            and record.name not in self._modules
+        ):
             # Log INFO and DEBUG only with enabled modules
             return
         levels = {

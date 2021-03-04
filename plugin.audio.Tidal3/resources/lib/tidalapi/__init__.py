@@ -127,14 +127,14 @@ class Session(object):
 
     @property
     def is_logged_in(self):
-        return True if self.session_id and self.country_code and self.user else False
+        return bool(self.session_id and self.country_code and self.user)
 
     def check_login(self):
         """ Returns true if current session is valid, false otherwise. """
         if not self.is_logged_in:
             return False
         self.user.subscription = self.get_user_subscription(self.user.id)
-        return True if self.user.subscription != None else False
+        return self.user.subscription != None
 
     def request(self, method, path, params=None, data=None, headers=None):
         request_headers = {}
@@ -150,7 +150,7 @@ class Session(object):
         url = urljoin(self._config.api_location, path)
         if self.is_logged_in:
             # Request with API Session if SessionId is not given in headers parameter
-            if not 'X-Tidal-SessionId' in request_headers:
+            if 'X-Tidal-SessionId' not in request_headers:
                 request_headers.update({'X-Tidal-SessionId': self.session_id})
         else:
             # Request with Preview-Token. Remove SessionId if given via headers parameter
@@ -415,9 +415,13 @@ class Session(object):
         return result
 
     def get_media_url(self, track_id, quality=None, cut_id=None, fallback=True):
-        soundQuality = quality if quality else self._config.quality
+        soundQuality = quality or self._config.quality
         media = self.get_track_url(track_id, quality=soundQuality, cut_id=cut_id)
-        if fallback and soundQuality == Quality.lossless and (media == None or media.isEncrypted):
+        if (
+            fallback
+            and soundQuality == Quality.lossless
+            and (media is None or media.isEncrypted)
+        ):
             log.debug(media.url)
             if media:
                 # Got Encrypted Stream. Retry with HIGH Quality
@@ -434,12 +438,11 @@ class Session(object):
         if self.is_logged_in:
             if cut_id:
                 url = 'cuts/%s/streamUrl' % cut_id
-                params.update({'soundQuality': quality if quality else self._config.quality})
             else:
                 url = 'tracks/%s/streamUrl' % track_id
-                params.update({'soundQuality': quality if quality else self._config.quality})
-                #url = 'tracks/%s/urlpostpaywall' % track_id
-                #params = {'urlusagemode': 'STREAM', 'assetpresentation': 'FULL', 'audioquality': quality if quality else self._config.quality}
+                        #url = 'tracks/%s/urlpostpaywall' % track_id
+                        #params = {'urlusagemode': 'STREAM', 'assetpresentation': 'FULL', 'audioquality': quality if quality else self._config.quality}
+            params.update({'soundQuality': quality or self._config.quality})
         else:
             url = 'tracks/%s/previewurl' % track_id
         return self._map_request(url,  params=params, ret='track_url')
@@ -451,7 +454,12 @@ class Session(object):
             #if quality:
             #    params = {'videoQuality': quality}
             url = 'videos/%s/urlpostpaywall' % video_id
-            params = {'urlusagemode': 'STREAM', 'assetpresentation': 'FULL', 'videoquality': quality if quality else 'HIGH' }
+            params = {
+                'urlusagemode': 'STREAM',
+                'assetpresentation': 'FULL',
+                'videoquality': quality or 'HIGH',
+            }
+
         else:
             url = 'videos/%s/previewurl' % video_id
         return self._map_request(url,  ret='video_url', params=params)
@@ -505,8 +513,7 @@ class Session(object):
             parse = self._parse_mix
         else:
             raise NotImplementedError()
-        oneItem = parse(json_obj)
-        return oneItem
+        return parse(json_obj)
 
     def _parse_user(self, json_obj):
         return UserInfo(**json_obj)
@@ -594,7 +601,7 @@ class Session(object):
             video.artist = self._parse_artist(json_obj['artists'][0])
         if 'artists' in json_obj:
             video.artists, video._ftArtists = self._parse_all_artists(video.artist.id, json_obj['artists'])
-            if not 'artist' in json_obj and len(video.artists) > 0:
+            if 'artist' not in json_obj and len(video.artists) > 0:
                 video.artist = video.artists[0]
         else:
             video.artists = [video.artist]
@@ -626,8 +633,7 @@ class Session(object):
         return CutInfo(**json_obj)
 
     def _parse_mix(self, json_obj):
-        mix = Mix(**json_obj)
-        return mix
+        return Mix(**json_obj)
 
 
 #------------------------------------------------------------------------------
@@ -675,10 +681,7 @@ class Favorites(object):
         return items
 
     def add(self, content_type, item_ids):
-        if isinstance(item_ids, str):
-            ids = [item_ids]
-        else:
-            ids = item_ids
+        ids = [item_ids] if isinstance(item_ids, str) else item_ids
         param = {'artists': 'artistId', 'albums': 'albumId', 'playlists': 'uuid', 
                  'tracks': 'trackIds', 'videos': 'videoIds'}.get(content_type)
         ok = self._session.request('POST', self._base_url + '/%s' % content_type, data={param: ','.join(ids)}).ok
@@ -829,7 +832,7 @@ class User(object):
             for item in items:
                 if str(item.id) == str(item_id):
                     entry_no = item._playlist_pos
-            if entry_no == None:
+            if entry_no is None:
                 return False
         ok = False
         if playlist and playlist._etag:
@@ -845,9 +848,5 @@ class User(object):
             playlist = self._session.get_playlist(playlist.id)
         if playlist.numberOfItems < 1:
             return True
-        entries = []
-        i = 0
-        while i < playlist.numberOfItems:
-            entries.append('%s' % i)
-            i = i + 1
+        entries = ['%s' % i for i in range(playlist.numberOfItems)]
         return self.remove_playlist_entry(playlist, entry_no=','.join(entries))

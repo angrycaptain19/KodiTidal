@@ -95,7 +95,7 @@ class MyMonitor(xbmc.Monitor):
         log('MyMonitor() Object destroyed.')
 
     def _start_servers(self):
-        if self.http_server == None and self.http_thread == None:
+        if self.http_server is None and self.http_thread is None:
             try:
                 self.http_server = MyHTTPServer(('', self.config.fanart_server_port), MyHttpRequestHandler)
             except:
@@ -180,10 +180,10 @@ class MyMonitor(xbmc.Monitor):
 
     def onSettingsChanged(self):
         xbmc.Monitor.onSettingsChanged(self)
-        if self.reloginNeeded():
-            if xbmcgui.Dialog().yesno(heading=addon.getAddonInfo('name'), line1=_T(30256), line2=_T(30257)):
-                xbmc.executebuiltin('XBMC.RunPlugin(plugin://%s/login)' % addon.getAddonInfo('id'))
-            pass
+        if self.reloginNeeded() and xbmcgui.Dialog().yesno(
+            heading=addon.getAddonInfo('name'), line1=_T(30256), line2=_T(30257)
+        ):
+            xbmc.executebuiltin('XBMC.RunPlugin(plugin://%s/login)' % addon.getAddonInfo('id'))
 
     def run(self):
         log('MyMonitor: Service Started')

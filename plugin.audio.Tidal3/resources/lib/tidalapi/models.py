@@ -139,7 +139,7 @@ class Album(BrowsableMedia):
 
     @property
     def isMasterAlbum(self):
-        return True if self.audioQuality == Quality.hi_res else False
+        return self.audioQuality == Quality.hi_res
 
 
 class Artist(BrowsableMedia):
@@ -219,7 +219,7 @@ class Playlist(BrowsableMedia):
         self.last_updated = self.lastUpdated # For Backward Compatibility
         self.num_tracks = self.numberOfItems # For Backward Compatibility
         self.name = self.title               # For Backward Compatibility
-        if self.description == None:
+        if self.description is None:
             self.description = ''
         self._image = kwargs.get('image', None) # Because "image" is a property method
         if self.created:
@@ -375,8 +375,8 @@ class Video(PlayableMedia):
         text = ''
         for item in self._ftArtists:
             if len(text) > 0:
-                text = text + ', '
-            text = text + item.name
+                text += ', '
+            text += item.name
         if len(text) > 0:
             text = 'ft. by ' + text
         return text
@@ -533,7 +533,7 @@ class Subscription(Model):
             self.highestSoundQuality = {SubscriptionType.hifi: Quality.lossless, 
                                         SubscriptionType.premium: Quality.high,
                                         SubscriptionType.free: Quality.low}.get(self.type, Quality.high)
-        self.validUntil = self.parse_date(self.validUntil if self.validUntil else '2099-12-31')
+        self.validUntil = self.parse_date(self.validUntil or '2099-12-31')
 
     @property
     def type(self):
@@ -579,7 +579,7 @@ class TrackUrl(StreamUrl):
 
     @property
     def isEncrypted(self):
-        return True if self.encryptionKey or self.securityToken else False
+        return bool(self.encryptionKey or self.securityToken)
 
 
 class VideoUrl(StreamUrl):

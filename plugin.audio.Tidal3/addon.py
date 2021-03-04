@@ -93,7 +93,7 @@ def homepage_items():
                     if item_type in HOMEPAGE_ITEM_TYPES:
                         apiPath = module['pagedList']['dataApiPath']
                         item = FolderItem(module['title'], plugin.url_for(homepage_item, item_type, urllib.parse.quote_plus(apiPath)))
-                        if not apiPath in apiPaths:
+                        if apiPath not in apiPaths:
                             if item_type == 'MIX_LIST':
                                 item.name = item.name + ' (' + _P('videos') + ')'
                                 items.insert(1, item)
@@ -121,9 +121,7 @@ def homepage_item(item_type, path):
 def category(group):
     promoGroup = {'rising': 'RISING', 'discovery': 'DISCOVERY', 'featured': 'NEWS'}.get(group, None)
     items = session.get_category_items(group)
-    totalCount = 0
-    for item in items:
-        totalCount += len(item.content_types)
+    totalCount = sum(len(item.content_types) for item in items)
     if totalCount == 1:
         # Show Single content directly (Movies and TV Shows)
         for item in items:
@@ -138,7 +136,7 @@ def category(group):
         add_directory('Master %s (MQA)' % _T(30107), plugin.url_for(master_albums, offset=0))
         add_directory('Master %s (MQA)' % _T(30108), plugin.url_for(master_playlists, offset=0))
     # Add Category Items as Folders
-    add_items(items, content=None, end=not(promoGroup and totalCount <= 10))
+    add_items(items, content=None, end=not promoGroup or totalCount > 10)
     if promoGroup and totalCount <= 10:
         # Show up to 10 Promotions as single Items
         promoItems = session.get_featured(promoGroup, types=['ALBUM', 'PLAYLIST', 'VIDEO'])
@@ -517,7 +515,7 @@ def user_playlist_toggle():
     if not session.is_logged_in:
         return
     url = xbmc.getInfoLabel( "ListItem.FilenameandPath" )
-    if not _addon_id in url:
+    if _addon_id not in url:
         return
     if 'play_track/' in url:
         item_type = 'track'
@@ -634,7 +632,7 @@ def favorite_toggle():
         return
     path = xbmc.getInfoLabel('Container.FolderPath')
     url = xbmc.getInfoLabel( "ListItem.FileNameAndPath" )
-    if not _addon_id in url or '/favorites/' in path:
+    if _addon_id not in url or '/favorites/' in path:
         return
     try:
         isFavorite = False
@@ -642,33 +640,33 @@ def favorite_toggle():
         if 'artist/' in url:
             item_id = url.split('artist/')[1]
             item_id = int('0%s' % item_id.split('/')[0])
-            if not '/' in item_id:
+            if '/' not in item_id:
                 content_type = 'artists'
                 isFavorite = session.user.favorites.isFavoriteArtist(item_id)
         elif 'album/' in url:
             item_id = url.split('album/')[1]
             item_id = item_id.split('/')[0]
-            if not '/' in item_id:
+            if '/' not in item_id:
                 content_type = 'albums'
                 isFavorite = session.user.favorites.isFavoriteAlbum(item_id)
         elif 'play_track/' in url:
             item_id = url.split('play_track/')[1]
             item_id = item_id.split('/')[0] # Remove album_id behind the track_id
-            if not '/' in item_id:
+            if '/' not in item_id:
                 content_type = 'tracks'
                 isFavorite = session.user.favorites.isFavoriteTrack(item_id)
         elif 'playlist/' in url:
             item_id = url.split('playlist/')[1]
             item_id = item_id.split('/')[0] # Remove offset behind playlist_id
-            if not '/' in item_id:
+            if '/' not in item_id:
                 content_type = 'playlists'
                 isFavorite = session.user.favorites.isFavoritePlaylist(item_id)
         elif 'play_video/' in url:
             item_id = url.split('play_video/')[1]
-            if not '/' in item_id:
+            if '/' not in item_id:
                 content_type = 'videos'
                 isFavorite = session.user.favorites.isFavoriteVideo(item_id)
-        if content_type == None:
+        if content_type is None:
             return
         if isFavorite:
             favorites_remove(content_type, item_id)
@@ -697,10 +695,7 @@ def search_type(field):
         addon.setSetting('last_search_field', field)
         keyboard = xbmc.Keyboard('', _T(30206))
         keyboard.doModal()
-        if keyboard.isConfirmed():
-            search_text = keyboard.getText()
-        else:
-            search_text = ''
+        search_text = keyboard.getText() if keyboard.isConfirmed() else ''
     addon.setSetting('last_search_text', search_text)
     if search_text:
         searchresults = session.search(field, search_text)
@@ -825,10 +820,7 @@ if __name__ == '__main__':
         plugin.run(argv=newargv)
     except HTTPError as e:
         r = e.response
-        if r.status_code in [401, 403]:
-            msg = _T(30210)
-        else:
-            msg = r.reason
+        msg = _T(30210) if r.status_code in [401, 403] else r.reason
         try:
             msg = r.json().get('userMessage')
         except:

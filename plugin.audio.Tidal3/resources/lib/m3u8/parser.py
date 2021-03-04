@@ -58,9 +58,7 @@ def parse(content, strict=False):
         'expect_playlist': False,
         }
 
-    lineno = 0
-    for line in string_to_lines(content):
-        lineno += 1
+    for lineno, line in enumerate(string_to_lines(content), start=1):
         line = line.strip()
 
         if line.startswith(protocol.ext_x_byterange):
