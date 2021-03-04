@@ -50,9 +50,12 @@ plugin.name = addon.getAddonInfo('name')
 _addon_icon = os.path.join(addon.getAddonInfo('path'), 'icon.png')
 _addon_fanart = os.path.join(addon.getAddonInfo('path'), 'fanart.jpg')
 
-debug = DebugHelper(pluginName=addon.getAddonInfo('name'), 
-                    detailLevel=2 if addon.getSetting('debug_log') == 'true' else 1, 
-                    enableTidalApiLog= True if addon.getSetting('debug_log') == 'true' else False)
+debug = DebugHelper(
+    pluginName=addon.getAddonInfo('name'),
+    detailLevel=2 if addon.getSetting('debug_log') == 'true' else 1,
+    enableTidalApiLog=addon.getSetting('debug_log') == 'true',
+)
+
 
 log = debug.log
 
@@ -80,8 +83,7 @@ def _T(txtid):
         if not newid: return txtid
         txtid = newid
     try:
-        txt = addon.getLocalizedString(txtid)
-        return txt
+        return addon.getLocalizedString(txtid)
     except:
         return '%s' % txtid
 
@@ -93,7 +95,7 @@ def _P(key, default_txt=None):
              }.get(key.lower(), None)
     if newid:
         return _T(newid)
-    return default_txt if default_txt else key
+    return default_txt or key
 
 
 # Convert TIDAL-API Media into Kodi List Items
@@ -103,9 +105,12 @@ class HasListItem(object):
     _is_logged_in = False
 
     def setLabelFormat(self):
-        self._favorites_in_labels = True if addon.getSetting('favorites_in_labels') == 'true' else False
-        self._user_playlists_in_labels = True if addon.getSetting('user_playlists_in_labels') == 'true' else False
-        self._colored_labels = True if addon.getSetting('color_mode') == 'true' else False
+        self._favorites_in_labels = addon.getSetting('favorites_in_labels') == 'true'
+        self._user_playlists_in_labels = (
+            addon.getSetting('user_playlists_in_labels') == 'true'
+        )
+
+        self._colored_labels = addon.getSetting('color_mode') == 'true'
         if self._colored_labels:
             self.FOLDER_MASK = '[COLOR blue]{label}[/COLOR]'
             if self._favorites_in_labels:
@@ -121,10 +126,7 @@ class HasListItem(object):
             self.MASTER_AUDIO_MASK = '{label} [COLOR blue]MQA[/COLOR]'
         else:
             self.FOLDER_MASK = '{label}'
-            if self._favorites_in_labels:
-                self.FAVORITE_MASK = '<{label}>'
-            else:
-                self.FAVORITE_MASK = '{label}'
+            self.FAVORITE_MASK = '<{label}>' if self._favorites_in_labels else '{label}'
             self.STREAM_LOCKED_MASK = '{label} ({info})'
             if self._user_playlists_in_labels:
                 self.USER_PLAYLIST_MASK = '{label} [{userpl}]'
@@ -179,14 +181,16 @@ class AlbumItem(Album, HasListItem):
     def getLabel(self, extended=True):
         self.setLabelFormat()
         label = self.getLongTitle()
-        if extended and self._isFavorite and not '/favorites/' in sys.argv[0]:
+        if extended and self._isFavorite and '/favorites/' not in sys.argv[0]:
             label = self.FAVORITE_MASK.format(label=label)
         label = '%s - %s' % (self.artist.getLabel(extended), label)
-        txt = []
         plids = list(self._userplaylists.keys())
-        for plid in plids:
-            if plid != self._playlist_id:
-                txt.append('%s' % self._userplaylists.get(plid).get('title'))
+        txt = [
+            '%s' % self._userplaylists.get(plid).get('title')
+            for plid in plids
+            if plid != self._playlist_id
+        ]
+
         if extended and txt:
             label = self.USER_PLAYLIST_MASK.format(label=label, userpl=', '.join(txt))
         return label
@@ -198,7 +202,7 @@ class AlbumItem(Album, HasListItem):
             longTitle += ' (EP)'
         elif self.type == AlbumType.single:
             longTitle += ' (Single)'
-        if self.explicit and not 'Explicit' in self.title:
+        if self.explicit and 'Explicit' not in self.title:
             longTitle += ' (Explicit)'
         if getattr(self, 'year', None) and addon.getSetting('album_year_in_labels') == 'true':
             if self.releaseDate and self.releaseDate > datetime.datetime.now():
@@ -260,11 +264,15 @@ class ArtistItem(Artist, HasListItem):
 
     def __init__(self, item):
         self.__dict__.update(vars(item))
-        self._isLocked = True if VARIOUS_ARTIST_ID == '%s' % self.id else False
+        self._isLocked = VARIOUS_ARTIST_ID == '%s' % self.id
 
     def getLabel(self, extended=True):
         self.setLabelFormat()
-        if extended and self._isFavorite and not '/favorites/artists' in sys.argv[0]:
+        if (
+            extended
+            and self._isFavorite
+            and '/favorites/artists' not in sys.argv[0]
+        ):
             return self.FAVORITE_MASK.format(label=self.name)
         if self._isLocked and '/favorites/artists' in sys.argv[0]:
             return self.STREAM_LOCKED_MASK.format(label=self.name, info=_T(30260))
@@ -312,8 +320,7 @@ class MixItem(Mix, HasListItem):
 
     def getLabel(self, extended=True):
         self.setLabelFormat()
-        label = self.name
-        return label
+        return self.name
 
     def getListItem(self):
         li = HasListItem.getListItem(self)
@@ -343,7 +350,7 @@ class PlaylistItem(Playlist, HasListItem):
     def getLabel(self, extended=True):
         self.setLabelFormat()
         label = self.name
-        if extended and self._isFavorite and not '/favorites/' in sys.argv[0]:
+        if extended and self._isFavorite and '/favorites/' not in sys.argv[0]:
             label = self.FAVORITE_MASK.format(label=label)
         if self.type == 'USER' and sys.argv[0].lower().find('user_playlists') >= 0:
             defaultpl = []
@@ -353,7 +360,7 @@ class PlaylistItem(Playlist, HasListItem):
                 defaultpl.append(_P('videos'))
             if str(self.id) == addon.getSetting('default_albumplaylist_id'):
                 defaultpl.append(_P('albums'))
-            if len(defaultpl) > 0:
+            if defaultpl:
                 return self.DEFAULT_PLAYLIST_MASK.format(label=label, mediatype=', '.join(defaultpl))
         return label
 
@@ -422,7 +429,7 @@ class TrackItem(Track, HasListItem):
 
     def __init__(self, item):
         self.__dict__.update(vars(item))
-        if self.version and not self.version in self.title:
+        if self.version and self.version not in self.title:
             self.title += ' (%s)' % self.version
             self.version = None
         self.artist = ArtistItem(self.artist)
@@ -435,16 +442,23 @@ class TrackItem(Track, HasListItem):
         self.setLabelFormat()
         label1 = self.artist.getLabel(extended=extended if self.available else False)
         label2 = self.getLongTitle()
-        if extended and self._isFavorite and self.available and not '/favorites/' in sys.argv[0]:
+        if (
+            extended
+            and self._isFavorite
+            and self.available
+            and '/favorites/' not in sys.argv[0]
+        ):
             label2 = self.FAVORITE_MASK.format(label=label2)
         label = '%s - %s' % (label1, label2)
         if extended and not self.available:
             label = self.STREAM_LOCKED_MASK.format(label=label, info=_T(30242))
-        txt = []
         plids = list(self._userplaylists.keys())
-        for plid in plids:
-            if plid != self._playlist_id:
-                txt.append('%s' % self._userplaylists.get(plid).get('title'))
+        txt = [
+            '%s' % self._userplaylists.get(plid).get('title')
+            for plid in plids
+            if plid != self._playlist_id
+        ]
+
         if extended and txt:
             label = self.USER_PLAYLIST_MASK.format(label=label, userpl=', '.join(txt))
         return label
@@ -452,13 +466,12 @@ class TrackItem(Track, HasListItem):
     def getLongTitle(self):
         self.setLabelFormat()
         longTitle = self.title
-        if self.version and not self.version in self.title:
+        if self.version and self.version not in self.title:
             longTitle += ' (%s)' % self.version
-        if self.explicit and not 'Explicit' in self.title:
+        if self.explicit and 'Explicit' not in self.title:
             longTitle += ' (Explicit)'
-        if self.editable and isinstance(self._cut, CutInfo):
-            if self._cut.name:
-                longTitle += ' (%s)' % self._cut.name
+        if self.editable and isinstance(self._cut, CutInfo) and self._cut.name:
+            longTitle += ' (%s)' % self._cut.name
         if self.audioQuality == Quality.hi_res and addon.getSetting('mqa_in_labels') == 'true':
             longTitle = self.MASTER_AUDIO_MASK.format(label=longTitle)
         return longTitle
@@ -472,8 +485,8 @@ class TrackItem(Track, HasListItem):
         text = ''
         for item in self._ftArtists:
             if len(text) > 0:
-                text = text + ', '
-            text = text + item.name
+                text += ', '
+            text += item.name
         if len(text) > 0:
             text = 'ft. by ' + text
         return text
@@ -499,7 +512,7 @@ class TrackItem(Track, HasListItem):
             url = plugin.url_for_path('/stream_locked')
             isFolder = True
         longTitle = self.title
-        if self.explicit and not 'Explicit' in self.title:
+        if self.explicit and 'Explicit' not in self.title:
             longTitle += ' (Explicit)'
         infoLabel = {
             'title': longTitle,
@@ -570,23 +583,30 @@ class VideoItem(Video, HasListItem):
         if extended and self.artist._isFavorite and self.available:
             label1 = self.FAVORITE_MASK.format(label=label1)
         label2 = self.getLongTitle()
-        if extended and self._isFavorite and self.available and not '/favorites/' in sys.argv[0]:
+        if (
+            extended
+            and self._isFavorite
+            and self.available
+            and '/favorites/' not in sys.argv[0]
+        ):
             label2 = self.FAVORITE_MASK.format(label=label2)
         label = '%s - %s' % (label1, label2)
         if extended and not self.available:
             label = self.STREAM_LOCKED_MASK.format(label=label, info=_T(30242))
-        txt = []
         plids = list(self._userplaylists.keys())
-        for plid in plids:
-            if plid != self._playlist_id:
-                txt.append('%s' % self._userplaylists.get(plid).get('title'))
+        txt = [
+            '%s' % self._userplaylists.get(plid).get('title')
+            for plid in plids
+            if plid != self._playlist_id
+        ]
+
         if extended and txt:
             label = self.USER_PLAYLIST_MASK.format(label=label, userpl=', '.join(txt))
         return label
 
     def getLongTitle(self):
         longTitle = self.title
-        if self.explicit and not 'Explicit' in self.title:
+        if self.explicit and 'Explicit' not in self.title:
             longTitle += ' (Explicit)'
         if getattr(self, 'year', None):
             longTitle += ' (%s)' % self.year
@@ -596,8 +616,8 @@ class VideoItem(Video, HasListItem):
         text = ''
         for item in self._ftArtists:
             if len(text) > 0:
-                text = text + ', '
-            text = text + item.name
+                text += ', '
+            text += item.name
         if len(text) > 0:
             text = 'ft. by ' + text
         return text
@@ -690,10 +710,8 @@ class PromotionItem(Promotion, HasListItem):
             label = self.shortHeader
         if extended and self._isFavorite:
             label = self.FAVORITE_MASK.format(label=label)
-        txt = []
         plids = list(self._userplaylists.keys())
-        for plid in plids:
-            txt.append('%s' % self._userplaylists.get(plid).get('title'))
+        txt = ['%s' % self._userplaylists.get(plid).get('title') for plid in plids]
         if extended and txt:
             label = self.USER_PLAYLIST_MASK.format(label=label, userpl=', '.join(txt))
         return label
@@ -833,7 +851,7 @@ class FolderItem(BrowsableMedia, HasListItem):
 
     def getLabel(self, extended=True):
         self.setLabelFormat()
-        label = self._otherLabel if self._otherLabel else self.name
+        label = self._otherLabel or self.name
         if extended:
             label = self.FOLDER_MASK.format(label=label)
         return label
@@ -914,7 +932,7 @@ class LoginToken(object):
         primary_tokens = []
         secondary_tokens = []
         lossless = codec in ['FLAC', 'ALAC', 'MQA']
-        rtmp_relevant = False if api or lossless else True
+        rtmp_relevant = not api and not lossless
         video_modes = ['HTTP'] if api and forceHttpVideo else ['HLS', 'HTTP'] if api or forceHttpVideo else ['HLS']
         for tokenName in LoginToken.priority:
             token = LoginToken.getFeatures(tokenName)
@@ -973,7 +991,11 @@ class TidalConfig(Config):
         self.subscription_type = [SubscriptionType.hifi, SubscriptionType.premium][min(1, int('0' + addon.getSetting('subscription_type')))]
         self.client_unique_key = addon.getSetting('client_unique_key')
         self.quality = [Quality.lossless, Quality.high, Quality.low][min(2, int('0' + addon.getSetting('quality')))]
-        self.use_rtmp = True if addon.getSetting('music_option') == '3' and self.quality != Quality.lossless else False
+        self.use_rtmp = (
+            addon.getSetting('music_option') == '3'
+            and self.quality != Quality.lossless
+        )
+
         self.codec = ['FLAC', 'AAC', 'AAC'][min([2, int('0' + addon.getSetting('quality'))])]
         if addon.getSetting('music_option') == '1' and self.quality == Quality.lossless:
             self.codec = 'ALAC'
@@ -981,16 +1003,22 @@ class TidalConfig(Config):
             self.codec = 'MQA'
         self.maxVideoHeight = [9999, 1080, 720, 540, 480, 360, 240][min(6, int('0%s' % addon.getSetting('video_quality')))]
         self.pageSize = max(10, min(9999, int('0%s' % addon.getSetting('page_size'))))
-        self.debug = True if addon.getSetting('debug_log') == 'true' else False
-        self.debug_json = True if addon.getSetting('debug_json') == 'true' else False
-        self.forceHttpVideo = True if addon.getSetting('http_for_videos') == 'true' else False
+        self.debug = addon.getSetting('debug_log') == 'true'
+        self.debug_json = addon.getSetting('debug_json') == 'true'
+        self.forceHttpVideo = addon.getSetting('http_for_videos') == 'true'
         self.http_video_session_id = self.stream_session_id
         if self.forceHttpVideo:
             apiFeatures = LoginToken.getFeatures(self.session_token_name)
             if apiFeatures and apiFeatures.get('videoMode') == 'HTTP':
                 self.http_video_session_id = self.session_id
-        self.mqa_in_labels = True if addon.getSetting('mqa_in_labels') == 'true' and self.codec == 'MQA' else False
-        self.fanart_server_enabled = True if addon.getSetting('fanart_server_enabled') == 'true' else False
+        self.mqa_in_labels = (
+            addon.getSetting('mqa_in_labels') == 'true' and self.codec == 'MQA'
+        )
+
+        self.fanart_server_enabled = (
+            addon.getSetting('fanart_server_enabled') == 'true'
+        )
+
         self.fanart_server_port = int('0%s' % addon.getSetting('fanart_server_port'))
 
 
@@ -1028,7 +1056,7 @@ class TidalSession(Session):
         self._config.api_token = LoginToken.getToken(tokenName)
         self.session_id = None
         Session.login(self, username, password, subscription_type)
-        success = True if self.session_id else False
+        success = bool(self.session_id)
         if not api:
             self.stream_session_id = self.session_id
             if old_session_id:
@@ -1251,7 +1279,7 @@ class TidalSession(Session):
 
     def get_media_url(self, track_id, quality=None, cut_id=None, fallback=False):
         # return Session.get_media_url(self, track_id, quality=quality, cut_id=cut_id, fallback=fallback)
-        soundQuality = quality if quality else self._config.quality
+        soundQuality = quality or self._config.quality
         media = self.get_track_url(track_id, quality=soundQuality, cut_id=cut_id, fallback=True)
         if not media:
             return None
@@ -1260,11 +1288,15 @@ class TidalSession(Session):
     def get_track_url(self, track_id, quality=None, cut_id=None, fallback=True):
         oldSessionId = self.session_id
         self.session_id = self.stream_session_id
-        soundQuality = quality if quality else self._config.quality
+        soundQuality = quality or self._config.quality
         #if soundQuality == Quality.lossless and self._config.codec == 'MQA' and not cut_id:
         #    soundQuality = Quality.hi_res
         media = Session.get_track_url(self, track_id, quality=soundQuality, cut_id=cut_id)
-        if fallback and soundQuality == Quality.lossless and (media == None or media.isEncrypted):
+        if (
+            fallback
+            and soundQuality == Quality.lossless
+            and (media is None or media.isEncrypted)
+        ):
             log(media.url, level=xbmc.LOGWARNING)
             if media:
                 log('Got encryptionKey "%s" for track %s, trying HIGH Quality ...' % (media.encryptionKey, track_id), level=xbmc.LOGWARNING)
@@ -1366,7 +1398,7 @@ class TidalSession(Session):
                     self.add_directory_item(_T(30244).format(pos1=nextOffset, pos2=min(nextOffset+self._config.pageSize, totalNumberOfItems)), plugin.url_for_path(url))
             except:
                 log('Next Page for URL %s not set' % sys.argv[0], xbmc.LOGERROR)
-        if len(list_items) > 0:
+        if list_items:
             xbmcplugin.addDirectoryItems(plugin.handle, list_items)
         if end:
             xbmcplugin.endOfDirectory(plugin.handle)
@@ -1375,14 +1407,15 @@ class TidalSession(Session):
                 kodiVersion = kodiVersion.split('.')[0]
                 skinTheme = xbmc.getSkinDir().lower()
                 if 'onfluence' in skinTheme:
-                    if kodiVersion <= '16':
+                    if kodiVersion <= '16' or content not in [
+                        'musicvideos',
+                        'artists',
+                    ]:
                         xbmc.executebuiltin('Container.SetViewMode(506)')
                     elif content == 'musicvideos':
                         xbmc.executebuiltin('Container.SetViewMode(511)')
-                    elif content == 'artists':
-                        xbmc.executebuiltin('Container.SetViewMode(512)')
                     else:
-                        xbmc.executebuiltin('Container.SetViewMode(506)')
+                        xbmc.executebuiltin('Container.SetViewMode(512)')
                 elif 'estuary' in skinTheme:
                     xbmc.executebuiltin('Container.SetViewMode(55)')
             except:
@@ -1395,12 +1428,14 @@ class TidalSession(Session):
         self.add_list_items([item], end=end)
 
     def master_albums(self, offset=0, limit=999):
-        items = self.get_category_content('master', 'recommended', 'albums', offset=offset, limit=limit)
-        return items
+        return self.get_category_content(
+            'master', 'recommended', 'albums', offset=offset, limit=limit
+        )
 
     def master_playlists(self, offset=0, limit=999):
-        items = self.get_category_content('master', 'recommended', 'playlists', offset=offset, limit=limit)
-        return items
+        return self.get_category_content(
+            'master', 'recommended', 'playlists', offset=offset, limit=limit
+        )
 
     def show_busydialog(self, headline='', textline=''):
         self.progressWindow = xbmcgui.DialogProgressBG()
@@ -1426,7 +1461,7 @@ class TidalFavorites(Favorites):
             fd = xbmcvfs.File(FAVORITES_FILE, 'r')
             self.ids_content = fd.read()
             self.ids = eval(self.ids_content)
-            if not 'locked_artists' in self.ids:
+            if 'locked_artists' not in self.ids:
                 try:
                     fd2 = xbmcvfs.File(LOCKED_ARTISTS_FILE, 'r')
                     self.ids['locked_artists'] = eval(fd2.read())
@@ -1434,9 +1469,14 @@ class TidalFavorites(Favorites):
                 except:
                     self.ids['locked_artists'] = [VARIOUS_ARTIST_ID]
             fd.close()
-            self.ids_loaded = not (self.ids['artists'] == None or self.ids['albums'] == None or
-                                   self.ids['playlists'] == None or self.ids['tracks'] == None or
-                                   self.ids['videos'] == None)
+            self.ids_loaded = (
+                self.ids['artists'] != None
+                and self.ids['albums'] != None
+                and self.ids['playlists'] != None
+                and self.ids['tracks'] != None
+                and self.ids['videos'] != None
+            )
+
             if self.ids_loaded:
                 log('Loaded %s Favorites from disk.' % sum(len(self.ids[content]) for content in ['artists', 'albums', 'playlists', 'tracks', 'videos']))
         except:

@@ -126,14 +126,10 @@ class M3U8(object):
         )
 
     def __init__(self, content=None, base_path=None, base_uri=None, strict=False, cookies=None):
-        if content is not None:
-            self.data = parser.parse(content, strict)
-        else:
-            self.data = {}
+        self.data = parser.parse(content, strict) if content is not None else {}
         self._base_uri = base_uri
-        if self._base_uri:
-            if not self._base_uri.endswith('/'):
-                self._base_uri += '/'
+        if self._base_uri and not self._base_uri.endswith('/'):
+            self._base_uri += '/'
 
         self._initialize_attributes()
         self.base_path = base_path
@@ -236,7 +232,7 @@ class M3U8(object):
             output.append('#EXT-X-TARGETDURATION:' + int_or_float_to_string(self.target_duration))
         if self.program_date_time is not None:
             output.append('#EXT-X-PROGRAM-DATE-TIME:' + parser.format_date_time(self.program_date_time))
-        if not (self.playlist_type is None or self.playlist_type == ''):
+        if self.playlist_type is not None and self.playlist_type != '':
             output.append(
                 '#EXT-X-PLAYLIST-TYPE:%s' % str(self.playlist_type).upper())
         if self.is_i_frames_only:
@@ -280,10 +276,9 @@ class BasePathMixin(object):
             return None
         if parser.is_url(self.uri):
             return self.uri
-        else:
-            if self.base_uri is None:
-                raise ValueError('There can not be `absolute_uri` with no `base_uri` set')
-            return _urijoin(self.base_uri, self.uri)
+        if self.base_uri is None:
+            raise ValueError('There can not be `absolute_uri` with no `base_uri` set')
+        return _urijoin(self.base_uri, self.uri)
 
     @property
     def base_path(self):
@@ -519,10 +514,9 @@ class Playlist(BasePathMixin):
         for media in self.media:
             if media.type in media_types:
                 continue
-            else:
-                media_types += [media.type]
-                media_type = media.type.upper()
-                stream_inf.append('%s="%s"' % (media_type, media.group_id))
+            media_types += [media.type]
+            media_type = media.type.upper()
+            stream_inf.append('%s="%s"' % (media_type, media.group_id))
 
         return '#EXT-X-STREAM-INF:' + ','.join(stream_inf) + '\n' + self.uri
 

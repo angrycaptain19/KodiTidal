@@ -30,10 +30,20 @@ class iso8601(object):
             m = re_iso8601.match(datestring)
             d = m.groupdict()
             if d['hour'] and d['minute'] and d['second']:
-                dat = datetime.datetime(year=int(d['year']), month=int(d['month']), day=int(d['day']), hour=int(d['hour']), minute=int(d['minute']), second=int(d['second']))
+                return datetime.datetime(
+                    year=int(d['year']),
+                    month=int(d['month']),
+                    day=int(d['day']),
+                    hour=int(d['hour']),
+                    minute=int(d['minute']),
+                    second=int(d['second']),
+                )
+
             else:
-                dat = datetime.datetime(year=int(d['year']), month=int(d['month']), day=int(d['day']))
-            return dat
+                return datetime.datetime(
+                    year=int(d['year']), month=int(d['month']), day=int(d['day'])
+                )
+
         except:
             dat = datetime.datetime.now()
         return dat
